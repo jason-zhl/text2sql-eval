@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Test and type-check caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Eval outputs and LLM response cache
+results/
+cache/
+
+# SQLite sidecars (Chinook_Sqlite.sqlite itself is committed)
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+*.swp

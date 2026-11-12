@@ -1,0 +1,13 @@
+cases:
+  - id: album_count
+    tier: easy
+    text: "How many rows are in the Album table?"
+    expected: "SELECT COUNT(*) FROM Album"
+  - id: employee_count_2003
+    tier: easy
+    text: "How many employees were hired in 2003?"
+    expected: "SELECT COUNT(*) FROM Employee WHERE YEAR(HireDate) = 2003"
+  - id: genre_count
+    tier: easy
+    text: "How many tracks are in the Genre table?"
+    expected: "SELECT COUNT(*) FROM Track"
