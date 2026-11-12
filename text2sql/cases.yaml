@@ -6,8 +6,64 @@ cases:
   - id: employee_count_2003
     tier: easy
     text: "How many employees were hired in 2003?"
-    expected: "SELECT COUNT(*) FROM Employee WHERE YEAR(HireDate) = 2003"
-  - id: genre_count
+    expected: "SELECT COUNT(*) FROM Employee WHERE strftime('%Y', HireDate) = '2003'"
+  - id: brazil_customer_count
     tier: easy
-    text: "How many tracks are in the Genre table?"
-    expected: "SELECT COUNT(*) FROM Track"
+    text: "How many customers are from Brazil?"
+    expected: "SELECT COUNT(*) FROM Customer WHERE Country = 'Brazil'"
+
+  - id: rock_track_count
+    tier: medium
+    text: "How many tracks are in the Rock genre?"
+    expected: >
+      SELECT COUNT(*)
+      FROM Track
+      WHERE GenreId = (SELECT GenreId FROM Genre WHERE Name = 'Rock');
+
+  - id: acdc_album_count
+    tier: medium
+    text: "How many albums does the artist AC/DC have?"
+    expected: >
+      SELECT COUNT(*)
+      FROM Album
+      WHERE ArtistId IN (SELECT ArtistId FROM Artist WHERE Name = 'AC/DC');
+
+  - id: canada_invoice_total
+    tier: medium
+    text: "What is the total amount of invoices billed to Canada?"
+    expected: >
+      SELECT SUM(Total)
+      FROM Invoice
+      WHERE BillingCountry = 'Canada';
+
+  - id: top_customer
+    tier: hard
+    text: "Which customer has spent the most in total? Return their first name, last name, and total spend."
+    expected: >
+      SELECT c.FirstName, c.LastName, SUM(i.Total) AS TotalSpend
+      FROM Customer c
+      JOIN Invoice i ON i.CustomerId = c.CustomerId
+      GROUP BY c.CustomerId
+      ORDER BY TotalSpend DESC
+      LIMIT 1;
+
+  - id: top_genre_revenue
+    tier: hard
+    text: "Which genre has generated the most revenue from invoice lines, using unit price times quantity? Return the genre name and that revenue."
+    expected: >
+      SELECT g.Name, SUM(il.UnitPrice * il.Quantity) AS Revenue
+      FROM InvoiceLine il
+      JOIN Track t ON t.TrackId = il.TrackId
+      JOIN Genre g ON g.GenreId = t.GenreId
+      GROUP BY g.GenreId
+      ORDER BY Revenue DESC
+      LIMIT 1;
+
+  - id: artists_without_albums
+    tier: hard
+    text: "List the names of artists who have no albums."
+    expected: >
+      SELECT ar.Name
+      FROM Artist ar
+      LEFT JOIN Album al ON al.ArtistId = ar.ArtistId
+      WHERE al.AlbumId IS NULL;
