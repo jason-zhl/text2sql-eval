@@ -67,3 +67,14 @@ cases:
       FROM Artist ar
       LEFT JOIN Album al ON al.ArtistId = ar.ArtistId
       WHERE al.AlbumId IS NULL;
+  - id: invoice_total_by_genre
+    tier: hard
+    text: "For each genre, what is the sum of Invoice.Total over invoices that contain at least one track of that genre? Return genre name and the sum. Include only genres that appear on at least one invoice."
+    expected: >
+      SELECT g.Name, SUM(i.Total)
+      FROM Genre g
+      JOIN (SELECT DISTINCT t.GenreId, il.InvoiceId
+            FROM InvoiceLine il
+            JOIN Track t ON t.TrackId = il.TrackId) x ON x.GenreId = g.GenreId
+      JOIN Invoice i ON i.InvoiceId = x.InvoiceId
+      GROUP BY g.GenreId;

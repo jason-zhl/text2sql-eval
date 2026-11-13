@@ -4,7 +4,9 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 from google import genai
-from google.genai import types
+from google.genai import errors, types
+
+_QUOTA_RETRIES = 5
 
 @dataclass
 class LLMResult:
@@ -21,6 +23,31 @@ load_dotenv()
 class LLMClient(Protocol):
   def complete(self, system: str, messages: list[dict]) -> LLMResult: ...
 
+def _retry_delay_s(details) -> float:
+  payloads = [details] if isinstance(details, dict) else []
+  error = details.get("error") if isinstance(details, dict) else None
+  if isinstance(error, dict):
+    payloads.append(error)
+  for payload in payloads:
+    items = payload.get("details")
+    if not isinstance(items, list):
+      continue
+    for item in items:
+      if isinstance(item, dict) and str(item.get("@type", "")).endswith("RetryInfo"):
+        return _parse_seconds(item.get("retryDelay")) + 1
+  return 31
+
+
+def _parse_seconds(delay) -> float:
+  text = str(delay).strip()
+  if text.endswith("s"):
+    text = text[:-1]
+  try:
+    return float(text)
+  except ValueError:
+    return 30
+
+
 _ROLES = {"user": "user", "assistant": "model", "model": "model"}
 class GeminiClient:
   def __init__(self, model: str, max_tokens: int = 1024):
@@ -32,15 +59,26 @@ class GeminiClient:
       {"role": _ROLES[message["role"]], "parts": [{"text": message["content"]}]}
       for message in messages
     ]
+    response = None
     started = time.perf_counter()
-    response = self._client.models.generate_content(
-      model=self.model,
-      contents=contents,
-      config=types.GenerateContentConfig(
-        system_instruction=system,
-        max_output_tokens=self.max_tokens,
-      ),
-    )
+    for attempt in range(1, _QUOTA_RETRIES + 1):
+      started = time.perf_counter()
+      try:
+        response = self._client.models.generate_content(
+          model=self.model,
+          contents=contents,
+          config=types.GenerateContentConfig(
+            system_instruction=system,
+            max_output_tokens=self.max_tokens,
+          ),
+        )
+        break
+      except errors.ClientError as exc:
+        if exc.code != 429 or attempt == _QUOTA_RETRIES:
+          raise
+        delay = _retry_delay_s(exc.details)
+        print(f"Rate limited, waiting {delay:.0f}s", flush=True)
+        time.sleep(delay)
     usage = response.usage_metadata
     cached = usage.cached_content_token_count or 0
     prompt = usage.prompt_token_count or 0

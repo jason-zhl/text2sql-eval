@@ -1,7 +1,17 @@
+import re
 from collections import Counter
 
 from harness.models import Score
 from text2sql.db import execute
+
+_FENCE = re.compile(r"```(?:sql)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+
+
+def _extract_sql(text: str) -> str:
+  match = _FENCE.search(text)
+  if match:
+    return match.group(1).strip()
+  return text.strip()
 
 
 def _normalize_cell(value):
@@ -21,7 +31,7 @@ def _normalize_rows(rows: list[tuple]) -> list[tuple]:
 
 class SQLScorer:
   def score(self, output: str, expected: str, order_matters: bool = False) -> Score:
-    got_rows, _got_columns, got_error = execute(output)
+    got_rows, _got_columns, got_error = execute(_extract_sql(output))
     if got_error:
       return Score(passed=False, error=got_error)
 

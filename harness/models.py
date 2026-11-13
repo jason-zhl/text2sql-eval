@@ -26,5 +26,21 @@ class Score:
   passed: bool
   error: str | None
 
+@dataclass
+class Result:
+  case_id: str
+  tier: str
+  config: str
+  model: str
+  passed: bool
+  error: str | None
+  attempts: int
+  input_tokens: int
+  output_tokens: int
+  cached_tokens: int
+  cost_usd: float | None
+  latency_s: float
+  generated_sql: str
+
 class Scorer(Protocol):
   def score(self, output: str, expected: str) -> Score: ...
