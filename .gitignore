@@ -42,3 +42,6 @@ cache/
 .idea/
 .vscode/
 *.swp
+
+# Other
+run.sh
