@@ -29,6 +29,7 @@ class Runner:
     input_tokens = 0
     output_tokens = 0
     cached_tokens = 0
+    cost_usd = 0.0
     latency_s = 0.0
     generated_sql = ""
     model = ""
@@ -41,6 +42,7 @@ class Runner:
       input_tokens += completion.input_tokens
       output_tokens += completion.output_tokens
       cached_tokens += completion.cached_tokens
+      cost_usd += self.llm.cost(completion)
       latency_s += completion.latency_s
       generated_sql = completion.text
       model = completion.model
@@ -65,7 +67,7 @@ class Runner:
       input_tokens=input_tokens,
       output_tokens=output_tokens,
       cached_tokens=cached_tokens,
-      cost_usd=None,
+      cost_usd=cost_usd,
       latency_s=latency_s,
       generated_sql=generated_sql,
     )

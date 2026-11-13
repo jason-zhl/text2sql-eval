@@ -19,9 +19,17 @@ class LLMResult:
   model: str
 
 
+# Paid standard tier, $ per million tokens: input, output (including thinking), cached input.
+# https://ai.google.dev/gemini-api/docs/pricing
+_PRICE_PER_MTOK = {
+  "gemini-3.5-flash-lite": (0.30, 2.50, 0.03),
+}
+
+
 load_dotenv()
 class LLMClient(Protocol):
   def complete(self, system: str, messages: list[dict]) -> LLMResult: ...
+  def cost(self, result: LLMResult) -> float: ...
 
 def _retry_delay_s(details) -> float:
   payloads = [details] if isinstance(details, dict) else []
@@ -51,9 +59,24 @@ def _parse_seconds(delay) -> float:
 _ROLES = {"user": "user", "assistant": "model", "model": "model"}
 class GeminiClient:
   def __init__(self, model: str, max_tokens: int = 1024):
+    try:
+      input_price, output_price, cached_price = _PRICE_PER_MTOK[model]
+    except KeyError:
+      known = ", ".join(sorted(_PRICE_PER_MTOK))
+      raise ValueError(f"No $/Mtok rates for {model}. Known models: {known}")
     self.model = model
+    self.input_per_mtok = input_price
+    self.output_per_mtok = output_price
+    self.cached_per_mtok = cached_price
     self.max_tokens = max_tokens
     self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+
+  def cost(self, result: LLMResult) -> float:
+    return (
+      result.input_tokens * self.input_per_mtok
+      + result.output_tokens * self.output_per_mtok
+      + result.cached_tokens * self.cached_per_mtok
+    ) / 1_000_000
   def complete(self, system: str, messages: list[dict]) -> LLMResult:
     contents = [
       {"role": _ROLES[message["role"]], "parts": [{"text": message["content"]}]}

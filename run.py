@@ -2,6 +2,7 @@ from pathlib import Path
 
 import yaml
 
+from harness.reporting import report
 import text2sql.configs
 from harness.llm import GeminiClient
 from harness.models import Case
@@ -23,5 +24,6 @@ if __name__ == "__main__":
   )
   cases = load_cases("text2sql/cases.yaml")
   for result in runner.run(cases):
-    print(f"{result.config} {result.case_id}: {result.passed} {result.error}")
-  print(runner.results_path)
+    if not result.passed:
+      print(f"{result.config} {result.case_id}: {result.passed} {result.error}")
+  report(runner.results_path, "report.md")
