@@ -78,3 +78,75 @@ cases:
             JOIN Track t ON t.TrackId = il.TrackId) x ON x.GenreId = g.GenreId
       JOIN Invoice i ON i.InvoiceId = x.InvoiceId
       GROUP BY g.GenreId;
+    - id: customers_who_own_full_album
+    tier: hard
+    text: "List the CustomerIds of customers who have purchased every track of at least one album (an album's tracks are the rows in Track with that AlbumId)."
+    expected: >
+      WITH album_size AS (
+        SELECT AlbumId, COUNT(*) AS n FROM Track
+        WHERE AlbumId IS NOT NULL GROUP BY AlbumId),
+      bought AS (
+        SELECT DISTINCT i.CustomerId, t.AlbumId, t.TrackId
+        FROM Invoice i
+        JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+        JOIN Track t ON t.TrackId = il.TrackId
+        WHERE t.AlbumId IS NOT NULL)
+      SELECT DISTINCT b.CustomerId
+      FROM bought b JOIN album_size a ON a.AlbumId = b.AlbumId
+      GROUP BY b.CustomerId, b.AlbumId
+      HAVING COUNT(*) = MAX(a.n);
+
+  - id: biggest_playlist
+    tier: hard
+    text: "Which playlist(s) contain the most distinct tracks? Return PlaylistId and name. If several playlists tie, return all of them."
+    expected: >
+      SELECT p.PlaylistId, p.Name
+      FROM Playlist p JOIN PlaylistTrack pt ON pt.PlaylistId = p.PlaylistId
+      GROUP BY p.PlaylistId
+      HAVING COUNT(DISTINCT pt.TrackId) = (
+        SELECT MAX(c) FROM (
+          SELECT COUNT(DISTINCT TrackId) AS c FROM PlaylistTrack GROUP BY PlaylistId));
+
+  - id: top3_tracks_per_genre
+    tier: hard
+    text: "For each genre, return the tracks whose revenue (sum of UnitPrice * Quantity over invoice lines) ranks in the top 3 within that genre, using RANK() so tied tracks share a rank and all tracks with rank <= 3 are returned. Only consider tracks that have been sold. Return genre name, TrackId, track name, revenue."
+    expected: >
+      WITH rev AS (
+        SELECT t.TrackId, t.GenreId, SUM(il.UnitPrice * il.Quantity) AS revenue
+        FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId
+        GROUP BY t.TrackId),
+      r AS (
+        SELECT *, RANK() OVER (PARTITION BY GenreId ORDER BY revenue DESC) AS rk FROM rev)
+      SELECT g.Name, r.TrackId, t.Name, r.revenue
+      FROM r JOIN Track t ON t.TrackId = r.TrackId
+      JOIN Genre g ON g.GenreId = r.GenreId
+      WHERE r.rk <= 3;
+
+  - id: monthly_revenue_change
+    tier: hard
+    text: "For each calendar month that has at least one invoice, return the month as YYYY-MM, total revenue (sum of Invoice.Total), and the change in revenue versus the previous month in the result (NULL for the first month)."
+    expected: >
+      WITH m AS (
+        SELECT strftime('%Y-%m', InvoiceDate) AS month, SUM(Total) AS revenue
+        FROM Invoice GROUP BY 1)
+      SELECT month, revenue,
+             revenue - LAG(revenue) OVER (ORDER BY month) AS change
+      FROM m;
+
+  - id: above_trimmed_average_spenders
+    tier: hard
+    text: "Compute the average total spend per customer, excluding the 5 highest-spending customers from the average (break ties by lowest CustomerId). Return the CustomerIds of all customers, including those top 5, whose total spend is strictly greater than that average."
+    expected: >
+      WITH s AS (
+        SELECT CustomerId, SUM(Total) AS spend FROM Invoice GROUP BY CustomerId),
+      r AS (
+        SELECT *, ROW_NUMBER() OVER (ORDER BY spend DESC, CustomerId) AS rn FROM s),
+      a AS (SELECT AVG(spend) AS avg_spend FROM r WHERE rn > 5)
+      SELECT r.CustomerId FROM r, a WHERE r.spend > a.avg_spend;
+
+  - id: total_reports
+    tier: hard
+    text: "For every employee, return first name, last name, and the total number of employees below them in the reporting hierarchy (direct and indirect). Employees with no reports should show 0."
+    expected: >
+      WITH RECURSIVE sub(root, id) AS (
+        SELECT EmployeeId,
